@@ -1,6 +1,6 @@
 // ==========================================
 // POSTGRESQL DATABASE FOR RENDER
-// Full Version with Sample Data
+// Royalty-Free Music Version
 // ==========================================
 
 const { Pool } = require('pg');
@@ -10,7 +10,6 @@ const bcrypt = require('bcryptjs');
 if (!process.env.DATABASE_URL) {
     console.error('❌ ERROR: DATABASE_URL is not set!');
     console.error('👉 Go to Render Dashboard → Environment → Add DATABASE_URL');
-    console.error('👉 Get the External URL from your PostgreSQL database');
     process.exit(1);
 }
 
@@ -65,6 +64,7 @@ const initDatabase = async () => {
                 name VARCHAR(255) NOT NULL,
                 bio TEXT,
                 image VARCHAR(500),
+                genre VARCHAR(100),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -74,6 +74,7 @@ const initDatabase = async () => {
                 artist_id INTEGER REFERENCES artists(id) ON DELETE SET NULL,
                 cover_image VARCHAR(500),
                 release_year INTEGER,
+                genre VARCHAR(100),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -87,6 +88,7 @@ const initDatabase = async () => {
                 cover_image VARCHAR(500),
                 is_premium BOOLEAN DEFAULT FALSE,
                 play_count INTEGER DEFAULT 0,
+                genre VARCHAR(100),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -151,7 +153,9 @@ const initDatabase = async () => {
 };
 
 // ==========================================
-// SEED DATA WITH IMAGES & MUSIC
+// SEED DATA - ROYALTY FREE MUSIC
+// All music from SoundHelix (royalty-free)
+// All images from Picsum/Pravatar (free)
 // ==========================================
 const seedData = async (client) => {
     try {
@@ -161,94 +165,171 @@ const seedData = async (client) => {
             return;
         }
         
-        console.log('🌱 Seeding with sample data...');
+        console.log('🌱 Seeding with royalty-free content...');
         
         // ==========================================
-        // ARTISTS (8 artists with avatar images)
+        // ARTISTS (Indie/Fictional - No Copyright Issues)
         // ==========================================
         await client.query(`
-            INSERT INTO artists (name, bio, image) VALUES
-            ('The Weeknd', 'Abel Makkonen Tesfaye, known professionally as the Weeknd, is a Canadian singer-songwriter and record producer known for his sonic versatility and dark lyricism.', 'https://i.pravatar.cc/300?img=33'),
-            ('Dua Lipa', 'Dua Lipa is an English singer and songwriter. After working as a model, she signed with Warner Bros Records and released her self-titled debut album in 2017.', 'https://i.pravatar.cc/300?img=5'),
-            ('Ed Sheeran', 'Edward Christopher Sheeran is an English singer-songwriter. Born in Halifax, West Yorkshire and raised in Framlingham, Suffolk, he began writing songs around the age of eleven.', 'https://i.pravatar.cc/300?img=12'),
-            ('Taylor Swift', 'Taylor Alison Swift is an American singer-songwriter. Her discography spans multiple genres, and her narrative songwriting—often inspired by her personal life—has received widespread critical praise.', 'https://i.pravatar.cc/300?img=9'),
-            ('Bruno Mars', 'Peter Gene Hernandez, known professionally as Bruno Mars, is an American singer-songwriter and record producer. He is known for his stage performances and retro showmanship.', 'https://i.pravatar.cc/300?img=68'),
-            ('Ariana Grande', 'Ariana Grande-Butera is an American singer, songwriter, and actress. Her four-octave vocal range has received critical acclaim, and her personal life has been the subject of widespread media attention.', 'https://i.pravatar.cc/300?img=47'),
-            ('Drake', 'Aubrey Drake Graham is a Canadian rapper, singer, and songwriter. An influential figure in contemporary popular music, Drake has been credited for popularizing singing and R&B sensibilities in hip hop.', 'https://i.pravatar.cc/300?img=51'),
-            ('Billie Eilish', 'Billie Eilish Pirate Baird O''Connell is an American singer-songwriter. She first gained public attention in 2015 with her debut single "Ocean Eyes", written and produced by her brother Finneas.', 'https://i.pravatar.cc/300?img=44')
+            INSERT INTO artists (name, bio, image, genre) VALUES
+            (
+                'Luna Eclipse',
+                'Luna Eclipse is an electronic music producer known for dreamy synth-pop soundscapes and atmospheric beats. Based in Berlin, she has been producing music since 2018.',
+                'https://i.pravatar.cc/300?img=1',
+                'Electronic/Synth-pop'
+            ),
+            (
+                'The Midnight Runners',
+                'The Midnight Runners are an alternative rock band formed in 2015. Their energetic performances and catchy hooks have earned them a dedicated fanbase.',
+                'https://i.pravatar.cc/300?img=11',
+                'Alternative Rock'
+            ),
+            (
+                'Skylar James',
+                'Skylar James is a soulful R&B artist with a voice that captivates audiences worldwide. Her music blends contemporary R&B with classic soul influences.',
+                'https://i.pravatar.cc/300?img=5',
+                'R&B/Soul'
+            ),
+            (
+                'Echo Valley',
+                'Echo Valley is an indie folk duo creating heartfelt acoustic music. Their songs tell stories of love, nature, and the human experience.',
+                'https://i.pravatar.cc/300?img=12',
+                'Indie Folk'
+            ),
+            (
+                'Neon Pulse',
+                'Neon Pulse is an EDM producer and DJ known for high-energy tracks that dominate dance floors. His signature sound combines house, techno, and future bass.',
+                'https://i.pravatar.cc/300?img=33',
+                'EDM/Electronic'
+            ),
+            (
+                'Sarah Mitchell',
+                'Sarah Mitchell is a singer-songwriter with a gift for crafting intimate acoustic songs. Her gentle vocals and poetic lyrics create a deeply personal listening experience.',
+                'https://i.pravatar.cc/300?img=9',
+                'Acoustic/Singer-Songwriter'
+            ),
+            (
+                'The Urban Collective',
+                'The Urban Collective is a hip-hop group bringing fresh beats and conscious lyrics. Their music addresses social issues while keeping the vibe upbeat and positive.',
+                'https://i.pravatar.cc/300?img=51',
+                'Hip-Hop/R&B'
+            ),
+            (
+                'Crystal Dawn',
+                'Crystal Dawn is a pop artist known for catchy melodies and uplifting lyrics. Her music is perfect for those feel-good moments and summer vibes.',
+                'https://i.pravatar.cc/300?img=44',
+                'Pop/Dance'
+            )
         `);
         
         // ==========================================
-        // ALBUMS (13 albums with cover images)
+        // ALBUMS
         // ==========================================
         await client.query(`
-            INSERT INTO albums (title, artist_id, cover_image, release_year) VALUES
-            ('After Hours', 1, 'https://picsum.photos/seed/afterhours/300/300', 2020),
-            ('Starboy', 1, 'https://picsum.photos/seed/starboy/300/300', 2016),
-            ('Future Nostalgia', 2, 'https://picsum.photos/seed/futurenostalgia/300/300', 2020),
-            ('Dua Lipa', 2, 'https://picsum.photos/seed/dualipa/300/300', 2017),
-            ('Divide', 3, 'https://picsum.photos/seed/divide/300/300', 2017),
-            ('Multiply', 3, 'https://picsum.photos/seed/multiply/300/300', 2014),
-            ('1989', 4, 'https://picsum.photos/seed/ts1989/300/300', 2014),
-            ('Lover', 4, 'https://picsum.photos/seed/lover/300/300', 2019),
-            ('24K Magic', 5, 'https://picsum.photos/seed/24kmagic/300/300', 2016),
-            ('Doo-Wops and Hooligans', 5, 'https://picsum.photos/seed/doowops/300/300', 2010),
-            ('Positions', 6, 'https://picsum.photos/seed/positions/300/300', 2020),
-            ('Scorpion', 7, 'https://picsum.photos/seed/scorpion/300/300', 2018),
-            ('Happier Than Ever', 8, 'https://picsum.photos/seed/happier/300/300', 2021)
+            INSERT INTO albums (title, artist_id, cover_image, release_year, genre) VALUES
+            -- Luna Eclipse Albums
+            ('Midnight Dreams', 1, 'https://picsum.photos/seed/midnightdreams/300/300', 2023, 'Electronic'),
+            ('Neon Nights', 1, 'https://picsum.photos/seed/neonnights/300/300', 2022, 'Synth-pop'),
+            
+            -- The Midnight Runners Albums
+            ('Running Wild', 2, 'https://picsum.photos/seed/runningwild/300/300', 2023, 'Alternative Rock'),
+            ('City Lights', 2, 'https://picsum.photos/seed/citylights/300/300', 2021, 'Rock'),
+            
+            -- Skylar James Albums
+            ('Velvet Soul', 3, 'https://picsum.photos/seed/velvetsoul/300/300', 2023, 'R&B'),
+            ('Midnight Confessions', 3, 'https://picsum.photos/seed/midnightconf/300/300', 2022, 'Soul'),
+            
+            -- Echo Valley Albums
+            ('Mountain Songs', 4, 'https://picsum.photos/seed/mountainsongs/300/300', 2023, 'Folk'),
+            ('Autumn Tales', 4, 'https://picsum.photos/seed/autumntales/300/300', 2021, 'Indie Folk'),
+            
+            -- Neon Pulse Albums
+            ('Electric Atmosphere', 5, 'https://picsum.photos/seed/electricatm/300/300', 2023, 'EDM'),
+            ('Bass Drop', 5, 'https://picsum.photos/seed/bassdrop/300/300', 2022, 'Electronic'),
+            
+            -- Sarah Mitchell Albums
+            ('Quiet Moments', 6, 'https://picsum.photos/seed/quietmoments/300/300', 2023, 'Acoustic'),
+            ('Stories Untold', 6, 'https://picsum.photos/seed/storiesuntold/300/300', 2021, 'Singer-Songwriter'),
+            
+            -- The Urban Collective Albums
+            ('Street Wisdom', 7, 'https://picsum.photos/seed/streetwisdom/300/300', 2023, 'Hip-Hop'),
+            ('Rise Up', 7, 'https://picsum.photos/seed/riseup/300/300', 2022, 'R&B'),
+            
+            -- Crystal Dawn Albums
+            ('Sunshine Pop', 8, 'https://picsum.photos/seed/sunshinepop/300/300', 2023, 'Pop'),
+            ('Dance Forever', 8, 'https://picsum.photos/seed/danceforever/300/300', 2022, 'Dance')
         `);
         
         // ==========================================
-        // SONGS (30 songs with audio from SoundHelix)
+        // SONGS (Using SoundHelix - Royalty Free Music)
+        // https://www.soundhelix.com/examples/mp3/
         // ==========================================
         await client.query(`
-            INSERT INTO songs (title, artist_id, album_id, duration, file_path, cover_image, is_premium, play_count) VALUES
+            INSERT INTO songs (title, artist_id, album_id, duration, file_path, cover_image, is_premium, play_count, genre) VALUES
             
-            -- The Weeknd (4 songs)
-            ('Blinding Lights', 1, 1, 200, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', 'https://picsum.photos/seed/blinding/300/300', FALSE, 15420),
-            ('Save Your Tears', 1, 1, 215, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', 'https://picsum.photos/seed/saveyour/300/300', FALSE, 12350),
-            ('Starboy', 1, 2, 230, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', 'https://picsum.photos/seed/starboysong/300/300', TRUE, 18900),
-            ('The Hills', 1, 2, 242, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', 'https://picsum.photos/seed/thehills/300/300', FALSE, 9800),
+            -- Luna Eclipse - Midnight Dreams (Album 1)
+            ('Dreaming in Color', 1, 1, 367, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', 'https://picsum.photos/seed/dreaming/300/300', FALSE, 15420, 'Electronic'),
+            ('Starlight Symphony', 1, 1, 423, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', 'https://picsum.photos/seed/starlight/300/300', FALSE, 12350, 'Synth-pop'),
+            ('Digital Horizon', 1, 1, 298, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', 'https://picsum.photos/seed/digital/300/300', TRUE, 18900, 'Electronic'),
             
-            -- Dua Lipa (4 songs)
-            ('Levitating', 2, 3, 203, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3', 'https://picsum.photos/seed/levitating/300/300', FALSE, 14200),
-            ('Dont Start Now', 2, 3, 183, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3', 'https://picsum.photos/seed/dontstart/300/300', TRUE, 13100),
-            ('New Rules', 2, 4, 209, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3', 'https://picsum.photos/seed/newrules/300/300', FALSE, 16500),
-            ('Physical', 2, 3, 194, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', 'https://picsum.photos/seed/physical/300/300', FALSE, 8900),
+            -- Luna Eclipse - Neon Nights (Album 2)
+            ('City Glow', 1, 2, 345, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', 'https://picsum.photos/seed/cityglow/300/300', FALSE, 9800, 'Synth-pop'),
             
-            -- Ed Sheeran (4 songs)
-            ('Shape of You', 3, 5, 234, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3', 'https://picsum.photos/seed/shapeofyou/300/300', FALSE, 25000),
-            ('Perfect', 3, 5, 263, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3', 'https://picsum.photos/seed/perfect/300/300', TRUE, 19800),
-            ('Thinking Out Loud', 3, 6, 281, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3', 'https://picsum.photos/seed/thinking/300/300', FALSE, 17600),
-            ('Photograph', 3, 6, 258, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3', 'https://picsum.photos/seed/photograph/300/300', FALSE, 14300),
+            -- The Midnight Runners - Running Wild (Album 3)
+            ('Break Free', 2, 3, 312, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3', 'https://picsum.photos/seed/breakfree/300/300', FALSE, 14200, 'Rock'),
+            ('Thunder Road', 2, 3, 287, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3', 'https://picsum.photos/seed/thunder/300/300', TRUE, 13100, 'Alternative'),
+            ('Wild Hearts', 2, 3, 334, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3', 'https://picsum.photos/seed/wildhearts/300/300', FALSE, 16500, 'Rock'),
             
-            -- Taylor Swift (4 songs)
-            ('Shake It Off', 4, 7, 219, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3', 'https://picsum.photos/seed/shakeitoff/300/300', FALSE, 21000),
-            ('Blank Space', 4, 7, 231, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3', 'https://picsum.photos/seed/blankspace/300/300', TRUE, 18700),
-            ('Cruel Summer', 4, 8, 178, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3', 'https://picsum.photos/seed/cruelsummer/300/300', FALSE, 16200),
-            ('Love Story', 4, 7, 235, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3', 'https://picsum.photos/seed/lovestory/300/300', FALSE, 22100),
+            -- The Midnight Runners - City Lights (Album 4)
+            ('Downtown Nights', 2, 4, 298, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', 'https://picsum.photos/seed/downtown/300/300', FALSE, 8900, 'Alternative Rock'),
             
-            -- Bruno Mars (4 songs)
-            ('24K Magic', 5, 9, 226, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', 'https://picsum.photos/seed/24kmagicsong/300/300', FALSE, 15600),
-            ('Uptown Funk', 5, 9, 269, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', 'https://picsum.photos/seed/uptownfunk/300/300', TRUE, 28000),
-            ('Just The Way You Are', 5, 10, 221, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', 'https://picsum.photos/seed/justtheway/300/300', FALSE, 19400),
-            ('Grenade', 5, 10, 223, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', 'https://picsum.photos/seed/grenade/300/300', FALSE, 14800),
+            -- Skylar James - Velvet Soul (Album 5)
+            ('Velvet Touch', 3, 5, 267, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3', 'https://picsum.photos/seed/velvet/300/300', FALSE, 25000, 'R&B'),
+            ('Soul on Fire', 3, 5, 312, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3', 'https://picsum.photos/seed/soulfire/300/300', TRUE, 19800, 'Soul'),
+            ('Midnight Rain', 3, 5, 289, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3', 'https://picsum.photos/seed/midrain/300/300', FALSE, 17600, 'R&B'),
             
-            -- Ariana Grande (3 songs)
-            ('Positions', 6, 11, 172, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3', 'https://picsum.photos/seed/positionssong/300/300', FALSE, 13200),
-            ('34 plus 35', 6, 11, 173, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3', 'https://picsum.photos/seed/3435/300/300', TRUE, 11800),
-            ('Thank U Next', 6, 11, 207, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3', 'https://picsum.photos/seed/thankunext/300/300', FALSE, 17900),
+            -- Skylar James - Midnight Confessions (Album 6)
+            ('Confession', 3, 6, 276, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3', 'https://picsum.photos/seed/confession/300/300', FALSE, 14300, 'Soul'),
             
-            -- Drake (3 songs)
-            ('Gods Plan', 7, 12, 198, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', 'https://picsum.photos/seed/godsplan/300/300', FALSE, 24500),
-            ('In My Feelings', 7, 12, 217, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3', 'https://picsum.photos/seed/inmyfeelings/300/300', TRUE, 19200),
-            ('Hotline Bling', 7, 12, 267, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3', 'https://picsum.photos/seed/hotlinebling/300/300', FALSE, 21800),
+            -- Echo Valley - Mountain Songs (Album 7)
+            ('Mountain High', 4, 7, 245, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3', 'https://picsum.photos/seed/mountain/300/300', FALSE, 21000, 'Folk'),
+            ('River Flow', 4, 7, 298, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3', 'https://picsum.photos/seed/river/300/300', TRUE, 18700, 'Indie Folk'),
+            ('Forest Path', 4, 7, 267, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3', 'https://picsum.photos/seed/forest/300/300', FALSE, 16200, 'Folk'),
             
-            -- Billie Eilish (4 songs)
-            ('Happier Than Ever', 8, 13, 298, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3', 'https://picsum.photos/seed/happiersong/300/300', FALSE, 12400),
-            ('Bad Guy', 8, 13, 194, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3', 'https://picsum.photos/seed/badguy/300/300', TRUE, 23600),
-            ('Lovely', 8, 13, 200, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3', 'https://picsum.photos/seed/lovely/300/300', FALSE, 18300),
-            ('Ocean Eyes', 8, 13, 200, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3', 'https://picsum.photos/seed/oceaneyes/300/300', FALSE, 15700)
+            -- Echo Valley - Autumn Tales (Album 8)
+            ('Falling Leaves', 4, 8, 234, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3', 'https://picsum.photos/seed/leaves/300/300', FALSE, 22100, 'Indie'),
+            
+            -- Neon Pulse - Electric Atmosphere (Album 9)
+            ('Electric Dreams', 5, 9, 356, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', 'https://picsum.photos/seed/electric/300/300', FALSE, 15600, 'EDM'),
+            ('Bass Kingdom', 5, 9, 312, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', 'https://picsum.photos/seed/bass/300/300', TRUE, 28000, 'Electronic'),
+            ('Neon Lights', 5, 9, 287, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', 'https://picsum.photos/seed/neonlights/300/300', FALSE, 19400, 'EDM'),
+            
+            -- Neon Pulse - Bass Drop (Album 10)
+            ('Drop Zone', 5, 10, 298, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', 'https://picsum.photos/seed/dropzone/300/300', FALSE, 14800, 'Electronic'),
+            
+            -- Sarah Mitchell - Quiet Moments (Album 11)
+            ('Gentle Morning', 6, 11, 234, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3', 'https://picsum.photos/seed/morning/300/300', FALSE, 13200, 'Acoustic'),
+            ('Whispered Words', 6, 11, 267, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3', 'https://picsum.photos/seed/whisper/300/300', TRUE, 11800, 'Singer-Songwriter'),
+            ('Peaceful Heart', 6, 11, 289, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3', 'https://picsum.photos/seed/peaceful/300/300', FALSE, 17900, 'Acoustic'),
+            
+            -- Sarah Mitchell - Stories Untold (Album 12)
+            ('Untold Story', 6, 12, 256, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', 'https://picsum.photos/seed/untold/300/300', FALSE, 15100, 'Singer-Songwriter'),
+            
+            -- The Urban Collective - Street Wisdom (Album 13)
+            ('Street Life', 7, 13, 312, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3', 'https://picsum.photos/seed/streetlife/300/300', FALSE, 24500, 'Hip-Hop'),
+            ('Wisdom Flow', 7, 13, 287, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3', 'https://picsum.photos/seed/wisdom/300/300', TRUE, 19200, 'Hip-Hop'),
+            ('Urban Dreams', 7, 13, 334, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3', 'https://picsum.photos/seed/urbandream/300/300', FALSE, 21800, 'R&B'),
+            
+            -- The Urban Collective - Rise Up (Album 14)
+            ('Rising Sun', 7, 14, 298, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3', 'https://picsum.photos/seed/risingsun/300/300', FALSE, 16400, 'Hip-Hop'),
+            
+            -- Crystal Dawn - Sunshine Pop (Album 15)
+            ('Sunny Day', 8, 15, 245, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3', 'https://picsum.photos/seed/sunny/300/300', FALSE, 12400, 'Pop'),
+            ('Happy Vibes', 8, 15, 267, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3', 'https://picsum.photos/seed/happy/300/300', TRUE, 23600, 'Pop'),
+            ('Summer Love', 8, 15, 289, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3', 'https://picsum.photos/seed/summerlove/300/300', FALSE, 18300, 'Pop'),
+            
+            -- Crystal Dawn - Dance Forever (Album 16)
+            ('Dance All Night', 8, 16, 312, 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3', 'https://picsum.photos/seed/dancenight/300/300', FALSE, 15700, 'Dance')
         `);
         
         // ==========================================
@@ -271,7 +352,18 @@ const seedData = async (client) => {
             ['premium', 'premium@example.com', hashedPassword, true, premiumExpires, 'https://ui-avatars.com/api/?background=ffd700&color=000&name=Premium+User&size=200']
         );
         
-        console.log('✅ Seeded: 8 artists, 13 albums, 30 songs, 2 users');
+        console.log('');
+        console.log('✅ Database seeded successfully!');
+        console.log('');
+        console.log('📊 Content Summary:');
+        console.log('   🎤 8 Artists (Indie/Fictional)');
+        console.log('   💿 16 Albums');
+        console.log('   🎵 32 Songs (24 free + 8 premium)');
+        console.log('   👤 2 Demo users');
+        console.log('');
+        console.log('🎵 Music Source: SoundHelix (Royalty-Free)');
+        console.log('🖼️ Images Source: Picsum/Pravatar (Free)');
+        console.log('');
         
     } catch (error) {
         console.error('❌ Seed error:', error.message);
@@ -305,7 +397,7 @@ const resetDatabase = async () => {
         // Reinitialize
         await initDatabase();
         
-        return { success: true, message: 'Database reset complete!' };
+        return { success: true, message: 'Database reset complete! 8 artists, 16 albums, 32 songs created.' };
     } catch (error) {
         if (client) client.release();
         console.error('Reset error:', error);

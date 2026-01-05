@@ -4,7 +4,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { getOne, getMany, execute } = require('../database/postgres');
+const { getOne, getMany, execute, resetDatabase } = require('../database/postgres');
 const { verifyToken, optionalAuth } = require('../middleware/authMiddleware');
 
 // ==========================================
@@ -14,7 +14,7 @@ router.get('/songs', optionalAuth, async (req, res) => {
     try {
         const { search, artist, album, limit = 50, offset = 0 } = req.query;
 
-        let query = `
+        let queryText = `
             SELECT 
                 s.*,
                 a.name as artist_name,
@@ -28,29 +28,29 @@ router.get('/songs', optionalAuth, async (req, res) => {
         let paramIndex = 1;
 
         if (search) {
-            query += ` AND (s.title ILIKE $${paramIndex} OR a.name ILIKE $${paramIndex})`;
+            queryText += ` AND (s.title ILIKE $${paramIndex} OR a.name ILIKE $${paramIndex})`;
             params.push(`%${search}%`);
             paramIndex++;
         }
 
         if (artist) {
-            query += ` AND s.artist_id = $${paramIndex}`;
+            queryText += ` AND s.artist_id = $${paramIndex}`;
             params.push(artist);
             paramIndex++;
         }
 
         if (album) {
-            query += ` AND s.album_id = $${paramIndex}`;
+            queryText += ` AND s.album_id = $${paramIndex}`;
             params.push(album);
             paramIndex++;
         }
 
-        query += ` ORDER BY s.play_count DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+        queryText += ` ORDER BY s.play_count DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
         params.push(parseInt(limit), parseInt(offset));
 
-        const songs = await getMany(query, params);
+        const songs = await getMany(queryText, params);
 
-        // Add liked status if user is authenticated
+        // Add liked status if authenticated
         if (req.user) {
             const likedSongs = await getMany(
                 'SELECT song_id FROM liked_songs WHERE user_id = $1',
@@ -92,8 +92,16 @@ router.get('/songs/:id', optionalAuth, async (req, res) => {
 
         // Check premium requirement
         if (song.is_premium && (!req.user || !req.user.is_premium)) {
-            song.file_path = null;
             song.requires_premium = true;
+        }
+
+        // Check if liked
+        if (req.user) {
+            const liked = await getOne(
+                'SELECT id FROM liked_songs WHERE user_id = $1 AND song_id = $2',
+                [req.user.id, song.id]
+            );
+            song.is_liked = !!liked;
         }
 
         res.json({ success: true, song });
@@ -242,7 +250,7 @@ router.get('/albums/:id', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Album not found' });
         }
 
-        const songs = await getMany('SELECT * FROM songs WHERE album_id = $1', [req.params.id]);
+        const songs = await getMany('SELECT * FROM songs WHERE album_id = $1 ORDER BY id', [req.params.id]);
 
         res.json({
             success: true,
@@ -273,18 +281,18 @@ router.post('/songs/:id/like', verifyToken, async (req, res) => {
                 'DELETE FROM liked_songs WHERE user_id = $1 AND song_id = $2',
                 [userId, songId]
             );
-            res.json({ success: true, liked: false, message: 'Song removed from liked songs' });
+            res.json({ success: true, liked: false, message: 'Removed from liked songs' });
         } else {
             await execute(
                 'INSERT INTO liked_songs (user_id, song_id) VALUES ($1, $2)',
                 [userId, songId]
             );
-            res.json({ success: true, liked: true, message: 'Song added to liked songs' });
+            res.json({ success: true, liked: true, message: 'Added to liked songs' });
         }
 
     } catch (error) {
         console.error('Like song error:', error);
-        res.status(500).json({ success: false, message: 'Failed to update like status' });
+        res.status(500).json({ success: false, message: 'Failed to update' });
     }
 });
 
@@ -449,7 +457,60 @@ router.post('/playlists/:id/songs', verifyToken, async (req, res) => {
 
     } catch (error) {
         console.error('Add to playlist error:', error);
-        res.status(500).json({ success: false, message: 'Failed to add song to playlist' });
+        res.status(500).json({ success: false, message: 'Failed to add song' });
+    }
+});
+
+// ==========================================
+// DELETE PLAYLIST
+// ==========================================
+router.delete('/playlists/:id', verifyToken, async (req, res) => {
+    try {
+        const playlist = await getOne(
+            'SELECT * FROM playlists WHERE id = $1 AND user_id = $2',
+            [req.params.id, req.user.id]
+        );
+        
+        if (!playlist) {
+            return res.status(404).json({ success: false, message: 'Playlist not found' });
+        }
+
+        await execute('DELETE FROM playlists WHERE id = $1', [req.params.id]);
+
+        res.json({ success: true, message: 'Playlist deleted' });
+
+    } catch (error) {
+        console.error('Delete playlist error:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete' });
+    }
+});
+
+// ==========================================
+// REMOVE SONG FROM PLAYLIST
+// ==========================================
+router.delete('/playlists/:id/songs/:songId', verifyToken, async (req, res) => {
+    try {
+        const { id, songId } = req.params;
+
+        const playlist = await getOne(
+            'SELECT * FROM playlists WHERE id = $1 AND user_id = $2',
+            [id, req.user.id]
+        );
+        
+        if (!playlist) {
+            return res.status(404).json({ success: false, message: 'Playlist not found' });
+        }
+
+        await execute(
+            'DELETE FROM playlist_songs WHERE playlist_id = $1 AND song_id = $2',
+            [id, songId]
+        );
+
+        res.json({ success: true, message: 'Song removed from playlist' });
+
+    } catch (error) {
+        console.error('Remove from playlist error:', error);
+        res.status(500).json({ success: false, message: 'Failed to remove' });
     }
 });
 
@@ -470,14 +531,16 @@ router.get('/history', verifyToken, async (req, res) => {
             LEFT JOIN albums al ON s.album_id = al.id
             WHERE ph.user_id = $1
             ORDER BY s.id, ph.played_at DESC
-            LIMIT 20
         `, [req.user.id]);
 
-        res.json({ success: true, history });
+        // Sort by played_at after distinct
+        history.sort((a, b) => new Date(b.played_at) - new Date(a.played_at));
+
+        res.json({ success: true, history: history.slice(0, 20) });
 
     } catch (error) {
         console.error('Get history error:', error);
-        res.status(500).json({ success: false, message: 'Failed to get play history' });
+        res.status(500).json({ success: false, message: 'Failed to get history' });
     }
 });
 
@@ -498,7 +561,7 @@ router.get('/home', optionalAuth, async (req, res) => {
             SELECT s.*, a.name as artist_name
             FROM songs s
             LEFT JOIN artists a ON s.artist_id = a.id
-            ORDER BY s.created_at DESC
+            ORDER BY s.id DESC
             LIMIT 10
         `);
 
@@ -508,7 +571,7 @@ router.get('/home', optionalAuth, async (req, res) => {
             LEFT JOIN songs s ON a.id = s.artist_id
             GROUP BY a.id
             ORDER BY song_count DESC
-            LIMIT 6
+            LIMIT 8
         `);
 
         const featuredAlbums = await getMany(`
@@ -516,8 +579,20 @@ router.get('/home', optionalAuth, async (req, res) => {
             FROM albums al
             LEFT JOIN artists a ON al.artist_id = a.id
             ORDER BY al.release_year DESC
-            LIMIT 6
+            LIMIT 8
         `);
+
+        // Add liked status if authenticated
+        if (req.user) {
+            const likedSongs = await getMany(
+                'SELECT song_id FROM liked_songs WHERE user_id = $1',
+                [req.user.id]
+            );
+            const likedIds = new Set(likedSongs.map(l => l.song_id));
+            
+            topSongs.forEach(song => song.is_liked = likedIds.has(song.id));
+            newReleases.forEach(song => song.is_liked = likedIds.has(song.id));
+        }
 
         res.json({
             success: true,
@@ -527,6 +602,114 @@ router.get('/home', optionalAuth, async (req, res) => {
     } catch (error) {
         console.error('Get home data error:', error);
         res.status(500).json({ success: false, message: 'Failed to get home data' });
+    }
+});
+
+// ==========================================
+// SEARCH
+// ==========================================
+router.get('/search', optionalAuth, async (req, res) => {
+    try {
+        const { q, type = 'all' } = req.query;
+
+        if (!q || q.trim().length < 2) {
+            return res.json({ success: true, results: { songs: [], artists: [], albums: [] } });
+        }
+
+        const searchTerm = `%${q}%`;
+        let results = { songs: [], artists: [], albums: [] };
+
+        if (type === 'all' || type === 'songs') {
+            results.songs = await getMany(`
+                SELECT s.*, a.name as artist_name, al.title as album_title
+                FROM songs s
+                LEFT JOIN artists a ON s.artist_id = a.id
+                LEFT JOIN albums al ON s.album_id = al.id
+                WHERE s.title ILIKE $1 OR a.name ILIKE $1
+                ORDER BY s.play_count DESC
+                LIMIT 10
+            `, [searchTerm]);
+        }
+
+        if (type === 'all' || type === 'artists') {
+            results.artists = await getMany(`
+                SELECT * FROM artists
+                WHERE name ILIKE $1 OR bio ILIKE $1
+                LIMIT 6
+            `, [searchTerm]);
+        }
+
+        if (type === 'all' || type === 'albums') {
+            results.albums = await getMany(`
+                SELECT al.*, a.name as artist_name
+                FROM albums al
+                LEFT JOIN artists a ON al.artist_id = a.id
+                WHERE al.title ILIKE $1 OR a.name ILIKE $1
+                LIMIT 6
+            `, [searchTerm]);
+        }
+
+        res.json({ success: true, results });
+
+    } catch (error) {
+        console.error('Search error:', error);
+        res.status(500).json({ success: false, message: 'Search failed' });
+    }
+});
+
+// ==========================================
+// RESET DATABASE (Admin only)
+// ==========================================
+router.post('/reset-database', async (req, res) => {
+    try {
+        const secretKey = req.headers['x-reset-key'];
+        
+        if (secretKey !== 'reset-spotify-2024') {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Forbidden. Use header: x-reset-key: reset-spotify-2024' 
+            });
+        }
+        
+        console.log('🔄 Resetting database...');
+        const result = await resetDatabase();
+        
+        res.json({ 
+            success: true, 
+            message: 'Database reset complete! 8 artists, 13 albums, 30 songs, 2 demo users created.' 
+        });
+        
+    } catch (error) {
+        console.error('Reset error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// ==========================================
+// GET STATS (for fun)
+// ==========================================
+router.get('/stats', async (req, res) => {
+    try {
+        const songs = await getOne('SELECT COUNT(*) as count FROM songs');
+        const artists = await getOne('SELECT COUNT(*) as count FROM artists');
+        const albums = await getOne('SELECT COUNT(*) as count FROM albums');
+        const users = await getOne('SELECT COUNT(*) as count FROM users');
+        const totalPlays = await getOne('SELECT SUM(play_count) as count FROM songs');
+
+        res.json({
+            success: true,
+            stats: {
+                songs: parseInt(songs.count),
+                artists: parseInt(artists.count),
+                albums: parseInt(albums.count),
+                users: parseInt(users.count),
+                total_plays: parseInt(totalPlays.count) || 0
+            }
+        });
+
+    } catch (error) {
+        console.error('Stats error:', error);
+        res.status(500).json({ success: false, message: 'Failed to get stats' });
     }
 });
 

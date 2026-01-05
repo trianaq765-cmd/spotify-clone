@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Success - Spotify Clone</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body class="success-page">
+    <div class="success-container">
+        <div class="success-card" id="success-card">
+            <div class="success-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h1>Payment Successful!</h1>
+            <p>Thank you for subscribing to Spotify Clone Premium.</p>
+            <div class="success-details" id="success-details">
+                <div class="detail-row">
+                    <span>Order ID:</span>
+                    <span id="order-id">-</span>
+                </div>
+                <div class="detail-row">
+                    <span>Status:</span>
+                    <span id="status" class="status-badge">Checking...</span>
+                </div>
+            </div>
+            <div class="success-actions">
+                <a href="/dashboard" class="btn-primary">Start Listening</a>
+                <a href="/premium" class="btn-secondary">View Subscription</a>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading-card" id="loading-card" style="display: none;">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Verifying your payment...</p>
+        </div>
+
+        <!-- Error State -->
+        <div class="error-card" id="error-card" style="display: none;">
+            <div class="error-icon">
+                <i class="fas fa-times-circle"></i>
+            </div>
+            <h1>Payment Failed</h1>
+            <p id="error-message">Something went wrong with your payment.</p>
+            <div class="error-actions">
+                <a href="/premium" class="btn-primary">Try Again</a>
+                <a href="/dashboard" class="btn-secondary">Back to Dashboard</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderId = urlParams.get('order_id');
+
+            const successCard = document.getElementById('success-card');
+            const loadingCard = document.getElementById('loading-card');
+            const errorCard = document.getElementById('error-card');
+
+            if (!orderId) {
+                successCard.style.display = 'none';
+                errorCard.style.display = 'block';
+                document.getElementById('error-message').textContent = 'No order ID found.';
+                return;
+            }
+
+            document.getElementById('order-id').textContent = orderId;
+
+            // Check payment status
+            const token = localStorage.getItem('spotify_token');
+            if (!token) {
+                window.location.href = '/login';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/payment/status/${orderId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const statusEl = document.getElementById('status');
+                    statusEl.textContent = data.transaction.status.toUpperCase();
+                    
+                    if (data.transaction.status === 'success') {
+                        statusEl.classList.add('success');
+                    } else if (data.transaction.status === 'pending') {
+                        statusEl.classList.add('pending');
+                    } else {
+                        statusEl.classList.add('failed');
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking status:', error);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -2,14 +2,13 @@
 // MUSIC PLAYER JAVASCRIPT
 // ==========================================
 
-// Player State
 let audioPlayer = null;
 let currentSong = null;
 let playlist = [];
 let currentIndex = 0;
 let isPlaying = false;
 let isShuffled = false;
-let repeatMode = 0; // 0: off, 1: all, 2: one
+let repeatMode = 0;
 let volume = 1;
 
 // ==========================================
@@ -18,7 +17,10 @@ let volume = 1;
 document.addEventListener('DOMContentLoaded', () => {
     audioPlayer = document.getElementById('audio-player');
     
-    if (!audioPlayer) return;
+    if (!audioPlayer) {
+        console.log('Audio player not found');
+        return;
+    }
     
     // Audio event listeners
     audioPlayer.addEventListener('timeupdate', updateProgress);
@@ -27,6 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
     audioPlayer.addEventListener('play', () => updatePlayButton(true));
     audioPlayer.addEventListener('pause', () => updatePlayButton(false));
     audioPlayer.addEventListener('error', handleAudioError);
+    audioPlayer.addEventListener('canplay', () => {
+        console.log('Audio can play');
+    });
     
     // Control buttons
     document.getElementById('btn-play')?.addEventListener('click', togglePlay);
@@ -37,10 +42,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-like-current')?.addEventListener('click', toggleCurrentLike);
     
     // Progress bar
-    document.getElementById('progress-bar')?.addEventListener('click', seekTo);
+    const progressBar = document.getElementById('progress-bar');
+    progressBar?.addEventListener('click', seekTo);
     
     // Volume control
-    document.getElementById('volume-bar')?.addEventListener('click', setVolume);
+    const volumeBar = document.getElementById('volume-bar');
+    volumeBar?.addEventListener('click', setVolume);
     document.getElementById('btn-volume')?.addEventListener('click', toggleMute);
     
     // Initialize volume
@@ -48,24 +55,29 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedVolume) {
         volume = parseFloat(savedVolume);
         audioPlayer.volume = volume;
-        updateVolumeUI();
     }
+    updateVolumeUI();
+    
+    console.log('Player initialized');
 });
 
 // ==========================================
 // PLAY FUNCTIONS
 // ==========================================
 const playSong = async (songId) => {
+    console.log('Playing song:', songId);
+    
     try {
         // Get song details first
         const songData = await apiRequest(`/music/songs/${songId}`);
         
-        if (!songData.success) {
+        if (!songData || !songData.success) {
             showToast('Song not found', 'error');
             return;
         }
         
         const song = songData.song;
+        console.log('Song data:', song);
         
         // Check if premium required
         if (song.is_premium && (!currentUser || !currentUser.is_premium)) {
@@ -73,36 +85,41 @@ const playSong = async (songId) => {
             return;
         }
         
-        // Request to play (increments count and returns file path)
+        // Request to play
         const playData = await apiRequest(`/music/songs/${songId}/play`, {
             method: 'POST'
         });
         
-        if (!playData.success) {
-            if (playData.requires_premium) {
+        if (!playData || !playData.success) {
+            if (playData?.requires_premium) {
                 showPremiumModal();
             } else {
-                showToast(playData.message || 'Cannot play song', 'error');
+                showToast(playData?.message || 'Cannot play song', 'error');
             }
             return;
         }
         
         // Set current song
         currentSong = song;
+        currentSong.file_path = playData.file_path;
         
         // Update player UI
         updatePlayerUI();
         
         // Play audio
+        console.log('Playing audio from:', playData.file_path);
         audioPlayer.src = playData.file_path;
-        audioPlayer.play().catch(e => {
-            console.error('Play error:', e);
-            // For demo, use a sample audio if the file doesn't exist
-            audioPlayer.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
-            audioPlayer.play();
-        });
         
-        isPlaying = true;
+        const playPromise = audioPlayer.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                console.log('Audio playing successfully');
+                isPlaying = true;
+            }).catch(error => {
+                console.error('Play error:', error);
+                showToast('Click play button to start', 'error');
+            });
+        }
         
     } catch (error) {
         console.error('Play song error:', error);
@@ -111,18 +128,22 @@ const playSong = async (songId) => {
 };
 
 const playMultipleSongs = async (songs, startIndex = 0) => {
-    if (!songs || songs.length === 0) return;
+    if (!songs || songs.length === 0) {
+        console.log('No songs to play');
+        return;
+    }
     
     playlist = songs;
     currentIndex = startIndex;
     
+    console.log('Playing playlist with', songs.length, 'songs');
     await playSong(playlist[currentIndex].id);
 };
 
 const playAlbum = async (albumId) => {
     try {
         const data = await apiRequest(`/music/albums/${albumId}`);
-        if (data.success && data.album.songs.length > 0) {
+        if (data && data.success && data.album.songs.length > 0) {
             await playMultipleSongs(data.album.songs);
         }
     } catch (error) {
@@ -133,7 +154,7 @@ const playAlbum = async (albumId) => {
 const playArtist = async (artistId) => {
     try {
         const data = await apiRequest(`/music/artists/${artistId}`);
-        if (data.success && data.artist.songs.length > 0) {
+        if (data && data.success && data.artist.songs.length > 0) {
             await playMultipleSongs(data.artist.songs);
         }
     } catch (error) {
@@ -144,7 +165,7 @@ const playArtist = async (artistId) => {
 const playPlaylist = async (playlistId) => {
     try {
         const data = await apiRequest(`/music/playlists/${playlistId}`);
-        if (data.success && data.playlist.songs.length > 0) {
+        if (data && data.success && data.playlist.songs.length > 0) {
             await playMultipleSongs(data.playlist.songs);
         }
     } catch (error) {
@@ -155,8 +176,10 @@ const playPlaylist = async (playlistId) => {
 const playLikedSongs = async () => {
     try {
         const data = await apiRequest('/music/liked');
-        if (data.success && data.songs.length > 0) {
+        if (data && data.success && data.songs.length > 0) {
             await playMultipleSongs(data.songs);
+        } else {
+            showToast('No liked songs yet', 'error');
         }
     } catch (error) {
         console.error('Play liked songs error:', error);
@@ -167,14 +190,17 @@ const playLikedSongs = async () => {
 // PLAYBACK CONTROLS
 // ==========================================
 const togglePlay = () => {
-    if (!audioPlayer.src) {
+    if (!audioPlayer.src || audioPlayer.src === window.location.href) {
         showToast('Select a song to play', 'error');
         return;
     }
     
     if (audioPlayer.paused) {
-        audioPlayer.play();
-        isPlaying = true;
+        audioPlayer.play().then(() => {
+            isPlaying = true;
+        }).catch(err => {
+            console.error('Play error:', err);
+        });
     } else {
         audioPlayer.pause();
         isPlaying = false;
@@ -183,7 +209,6 @@ const togglePlay = () => {
 
 const playPrevious = () => {
     if (audioPlayer.currentTime > 3) {
-        // Restart current song if more than 3 seconds played
         audioPlayer.currentTime = 0;
         return;
     }
@@ -209,7 +234,9 @@ const playNext = () => {
 const toggleShuffle = () => {
     isShuffled = !isShuffled;
     const btn = document.getElementById('btn-shuffle');
-    btn.classList.toggle('active', isShuffled);
+    if (btn) {
+        btn.classList.toggle('active', isShuffled);
+    }
     showToast(isShuffled ? 'Shuffle on' : 'Shuffle off');
 };
 
@@ -217,24 +244,27 @@ const toggleRepeat = () => {
     repeatMode = (repeatMode + 1) % 3;
     const btn = document.getElementById('btn-repeat');
     
-    btn.classList.remove('active');
-    btn.innerHTML = '<i class="fas fa-redo"></i>';
-    
-    if (repeatMode === 1) {
-        btn.classList.add('active');
-        showToast('Repeat all');
-    } else if (repeatMode === 2) {
-        btn.classList.add('active');
-        btn.innerHTML = '<i class="fas fa-redo"></i><span style="font-size: 0.6rem; position: absolute;">1</span>';
-        showToast('Repeat one');
-    } else {
-        showToast('Repeat off');
+    if (btn) {
+        btn.classList.remove('active');
+        btn.innerHTML = '<i class="fas fa-redo"></i>';
+        
+        if (repeatMode === 1) {
+            btn.classList.add('active');
+            showToast('Repeat all');
+        } else if (repeatMode === 2) {
+            btn.classList.add('active');
+            btn.innerHTML = '<i class="fas fa-redo"></i><span style="font-size:0.5rem;position:absolute;margin-left:-8px;">1</span>';
+            showToast('Repeat one');
+        } else {
+            showToast('Repeat off');
+        }
     }
 };
 
 const handleSongEnd = () => {
+    console.log('Song ended');
+    
     if (repeatMode === 2) {
-        // Repeat one
         audioPlayer.currentTime = 0;
         audioPlayer.play();
     } else if (playlist.length > 0) {
@@ -254,26 +284,38 @@ const handleSongEnd = () => {
 // PROGRESS & SEEK
 // ==========================================
 const updateProgress = () => {
-    if (!audioPlayer.duration) return;
+    if (!audioPlayer.duration || isNaN(audioPlayer.duration)) return;
     
     const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
-    document.getElementById('progress').style.width = `${progress}%`;
-    document.getElementById('time-current').textContent = formatTime(audioPlayer.currentTime);
+    const progressEl = document.getElementById('progress');
+    if (progressEl) {
+        progressEl.style.width = `${progress}%`;
+    }
+    
+    const currentEl = document.getElementById('time-current');
+    if (currentEl) {
+        currentEl.textContent = formatTime(audioPlayer.currentTime);
+    }
 };
 
 const updateDuration = () => {
-    document.getElementById('time-total').textContent = formatTime(audioPlayer.duration);
+    const totalEl = document.getElementById('time-total');
+    if (totalEl && audioPlayer.duration && !isNaN(audioPlayer.duration)) {
+        totalEl.textContent = formatTime(audioPlayer.duration);
+    }
 };
 
 const seekTo = (e) => {
     const bar = document.getElementById('progress-bar');
+    if (!bar || !audioPlayer.duration) return;
+    
     const rect = bar.getBoundingClientRect();
     const percent = (e.clientX - rect.left) / rect.width;
     audioPlayer.currentTime = percent * audioPlayer.duration;
 };
 
 const formatTime = (seconds) => {
-    if (isNaN(seconds)) return '0:00';
+    if (isNaN(seconds) || seconds === Infinity) return '0:00';
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -284,6 +326,8 @@ const formatTime = (seconds) => {
 // ==========================================
 const setVolume = (e) => {
     const bar = document.getElementById('volume-bar');
+    if (!bar) return;
+    
     const rect = bar.getBoundingClientRect();
     volume = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     audioPlayer.volume = volume;
@@ -295,22 +339,28 @@ const toggleMute = () => {
     if (audioPlayer.volume > 0) {
         audioPlayer.dataset.prevVolume = audioPlayer.volume;
         audioPlayer.volume = 0;
+        volume = 0;
     } else {
-        audioPlayer.volume = parseFloat(audioPlayer.dataset.prevVolume) || 1;
+        const prevVol = parseFloat(audioPlayer.dataset.prevVolume) || 1;
+        audioPlayer.volume = prevVol;
+        volume = prevVol;
     }
-    volume = audioPlayer.volume;
     updateVolumeUI();
 };
 
 const updateVolumeUI = () => {
-    document.getElementById('volume-level').style.width = `${volume * 100}%`;
+    const volumeLevel = document.getElementById('volume-level');
+    if (volumeLevel) {
+        volumeLevel.style.width = `${volume * 100}%`;
+    }
     
     const btn = document.getElementById('btn-volume');
-    let icon = 'fa-volume-up';
-    if (volume === 0) icon = 'fa-volume-mute';
-    else if (volume < 0.5) icon = 'fa-volume-down';
-    
-    btn.innerHTML = `<i class="fas ${icon}"></i>`;
+    if (btn) {
+        let icon = 'fa-volume-up';
+        if (volume === 0) icon = 'fa-volume-mute';
+        else if (volume < 0.5) icon = 'fa-volume-down';
+        btn.innerHTML = `<i class="fas ${icon}"></i>`;
+    }
 };
 
 // ==========================================
@@ -319,24 +369,48 @@ const updateVolumeUI = () => {
 const updatePlayerUI = () => {
     if (!currentSong) return;
     
-    document.getElementById('player-cover').src = currentSong.cover_image || '/images/default-album.png';
-    document.getElementById('player-title').textContent = currentSong.title;
-    document.getElementById('player-artist').textContent = currentSong.artist_name || 'Unknown Artist';
+    console.log('Updating player UI with:', currentSong);
+    
+    // Update cover image
+    const coverEl = document.getElementById('player-cover');
+    if (coverEl) {
+        const coverUrl = currentSong.cover_image || 'https://picsum.photos/seed/default/300/300';
+        coverEl.src = coverUrl;
+        coverEl.onerror = () => {
+            coverEl.src = 'https://picsum.photos/seed/default/300/300';
+        };
+    }
+    
+    // Update title
+    const titleEl = document.getElementById('player-title');
+    if (titleEl) {
+        titleEl.textContent = currentSong.title || 'Unknown';
+    }
+    
+    // Update artist
+    const artistEl = document.getElementById('player-artist');
+    if (artistEl) {
+        artistEl.textContent = currentSong.artist_name || 'Unknown Artist';
+    }
     
     // Update like button
     const likeBtn = document.getElementById('btn-like-current');
-    if (currentSong.is_liked) {
-        likeBtn.classList.add('liked');
-        likeBtn.innerHTML = '<i class="fas fa-heart"></i>';
-    } else {
-        likeBtn.classList.remove('liked');
-        likeBtn.innerHTML = '<i class="far fa-heart"></i>';
+    if (likeBtn) {
+        if (currentSong.is_liked) {
+            likeBtn.classList.add('liked');
+            likeBtn.innerHTML = '<i class="fas fa-heart"></i>';
+        } else {
+            likeBtn.classList.remove('liked');
+            likeBtn.innerHTML = '<i class="far fa-heart"></i>';
+        }
     }
 };
 
 const updatePlayButton = (playing) => {
     const btn = document.getElementById('btn-play');
-    btn.innerHTML = playing ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+    if (btn) {
+        btn.innerHTML = playing ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+    }
 };
 
 // ==========================================
@@ -352,16 +426,16 @@ const toggleCurrentLike = async () => {
             method: 'POST'
         });
         
-        if (data.success) {
+        if (data && data.success) {
             currentSong.is_liked = data.liked;
             
             if (data.liked) {
-                btn.classList.add('liked');
-                btn.innerHTML = '<i class="fas fa-heart"></i>';
+                btn?.classList.add('liked');
+                if (btn) btn.innerHTML = '<i class="fas fa-heart"></i>';
                 showToast('Added to Liked Songs');
             } else {
-                btn.classList.remove('liked');
-                btn.innerHTML = '<i class="far fa-heart"></i>';
+                btn?.classList.remove('liked');
+                if (btn) btn.innerHTML = '<i class="far fa-heart"></i>';
                 showToast('Removed from Liked Songs');
             }
         }
@@ -375,11 +449,9 @@ const toggleCurrentLike = async () => {
 // ==========================================
 const handleAudioError = (e) => {
     console.error('Audio error:', e);
-    // Try to play a demo audio for testing
-    if (!audioPlayer.src.includes('soundhelix')) {
-        audioPlayer.src = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
-        audioPlayer.play().catch(() => {
-            showToast('Cannot play audio', 'error');
-        });
-    }
+    console.error('Audio src:', audioPlayer.src);
+    console.error('Error code:', audioPlayer.error?.code);
+    console.error('Error message:', audioPlayer.error?.message);
+    
+    showToast('Cannot play audio. Try another song.', 'error');
 };

@@ -5,20 +5,49 @@
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
+// Validate DATABASE_URL
+if (!process.env.DATABASE_URL) {
+    console.error('❌ DATABASE_URL environment variable is not set!');
+    console.error('Please set DATABASE_URL in Render Dashboard → Environment');
+    process.exit(1);
+}
+
+console.log('🔄 Connecting to PostgreSQL...');
+console.log('📍 Database URL exists:', !!process.env.DATABASE_URL);
+
 // Create connection pool
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    ssl: {
+        rejectUnauthorized: false  // Required for Render PostgreSQL
+    },
+    // Connection pool settings
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+});
+
+// Test connection on startup
+pool.on('connect', () => {
+    console.log('✅ Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+    console.error('❌ Unexpected PostgreSQL error:', err);
 });
 
 // ==========================================
 // INITIALIZE DATABASE
 // ==========================================
 const initDatabase = async () => {
-    const client = await pool.connect();
+    let client;
     
     try {
         console.log('🔄 Initializing PostgreSQL database...');
+        
+        // Test connection first
+        client = await pool.connect();
+        console.log('✅ Database connection successful');
         
         // Create Tables
         await client.query(`
@@ -48,7 +77,7 @@ const initDatabase = async () => {
             CREATE TABLE IF NOT EXISTS albums (
                 id SERIAL PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
-                artist_id INTEGER REFERENCES artists(id),
+                artist_id INTEGER REFERENCES artists(id) ON DELETE SET NULL,
                 cover_image VARCHAR(500) DEFAULT '/images/default-album.png',
                 release_year INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -58,8 +87,8 @@ const initDatabase = async () => {
             CREATE TABLE IF NOT EXISTS songs (
                 id SERIAL PRIMARY KEY,
                 title VARCHAR(255) NOT NULL,
-                artist_id INTEGER REFERENCES artists(id),
-                album_id INTEGER REFERENCES albums(id),
+                artist_id INTEGER REFERENCES artists(id) ON DELETE SET NULL,
+                album_id INTEGER REFERENCES albums(id) ON DELETE SET NULL,
                 duration INTEGER DEFAULT 0,
                 file_path VARCHAR(500) NOT NULL,
                 cover_image VARCHAR(500),
@@ -73,7 +102,7 @@ const initDatabase = async () => {
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
                 description TEXT,
-                user_id INTEGER REFERENCES users(id),
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                 cover_image VARCHAR(500) DEFAULT '/images/default-playlist.png',
                 is_public BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -100,7 +129,7 @@ const initDatabase = async () => {
             -- Transactions Table
             CREATE TABLE IF NOT EXISTS transactions (
                 id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id),
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 order_id VARCHAR(255) UNIQUE NOT NULL,
                 amount DECIMAL(12,2) NOT NULL,
                 status VARCHAR(50) DEFAULT 'pending',
@@ -121,16 +150,21 @@ const initDatabase = async () => {
             );
         `);
         
+        console.log('✅ Tables created/verified successfully');
+        
         // Seed data if empty
         await seedData(client);
         
         console.log('✅ PostgreSQL database initialized successfully');
         
     } catch (error) {
-        console.error('❌ Database initialization error:', error);
+        console.error('❌ Database initialization error:', error.message);
+        console.error('Full error:', error);
         throw error;
     } finally {
-        client.release();
+        if (client) {
+            client.release();
+        }
     }
 };
 
@@ -138,102 +172,108 @@ const initDatabase = async () => {
 // SEED DATA
 // ==========================================
 const seedData = async (client) => {
-    // Check if data exists
-    const result = await client.query('SELECT COUNT(*) FROM artists');
-    if (parseInt(result.rows[0].count) > 0) {
-        console.log('📦 Database already seeded');
-        return;
+    try {
+        // Check if data exists
+        const result = await client.query('SELECT COUNT(*) FROM artists');
+        if (parseInt(result.rows[0].count) > 0) {
+            console.log('📦 Database already seeded');
+            return;
+        }
+        
+        console.log('🌱 Seeding database...');
+        
+        // Seed Artists
+        await client.query(`
+            INSERT INTO artists (name, bio, image) VALUES
+            ('The Weeknd', 'Canadian singer and songwriter', '/images/default-artist.png'),
+            ('Dua Lipa', 'English singer and songwriter', '/images/default-artist.png'),
+            ('Ed Sheeran', 'English singer-songwriter', '/images/default-artist.png'),
+            ('Taylor Swift', 'American singer-songwriter', '/images/default-artist.png'),
+            ('Bruno Mars', 'American singer and songwriter', '/images/default-artist.png')
+        `);
+        
+        // Seed Albums
+        await client.query(`
+            INSERT INTO albums (title, artist_id, cover_image, release_year) VALUES
+            ('After Hours', 1, '/images/default-album.png', 2020),
+            ('Future Nostalgia', 2, '/images/default-album.png', 2020),
+            ('Divide', 3, '/images/default-album.png', 2017),
+            ('1989', 4, '/images/default-album.png', 2014),
+            ('24K Magic', 5, '/images/default-album.png', 2016)
+        `);
+        
+        // Seed Songs
+        await client.query(`
+            INSERT INTO songs (title, artist_id, album_id, duration, file_path, cover_image, is_premium) VALUES
+            ('Blinding Lights', 1, 1, 200, '/music/sample1.mp3', '/images/default-album.png', FALSE),
+            ('Save Your Tears', 1, 1, 215, '/music/sample2.mp3', '/images/default-album.png', FALSE),
+            ('Levitating', 2, 2, 203, '/music/sample3.mp3', '/images/default-album.png', FALSE),
+            ('Dont Start Now', 2, 2, 183, '/music/sample4.mp3', '/images/default-album.png', TRUE),
+            ('Shape of You', 3, 3, 234, '/music/sample5.mp3', '/images/default-album.png', FALSE),
+            ('Perfect', 3, 3, 263, '/music/sample6.mp3', '/images/default-album.png', TRUE),
+            ('Shake It Off', 4, 4, 219, '/music/sample7.mp3', '/images/default-album.png', FALSE),
+            ('Blank Space', 4, 4, 231, '/music/sample8.mp3', '/images/default-album.png', TRUE),
+            ('24K Magic', 5, 5, 226, '/music/sample9.mp3', '/images/default-album.png', FALSE),
+            ('Uptown Funk', 5, 5, 269, '/music/sample10.mp3', '/images/default-album.png', TRUE)
+        `);
+        
+        // Create Demo Users
+        const hashedPassword = await bcrypt.hash('demo123', 10);
+        
+        await client.query(
+            'INSERT INTO users (username, email, password, is_premium) VALUES ($1, $2, $3, $4)',
+            ['demo', 'demo@example.com', hashedPassword, false]
+        );
+        
+        // Premium user with expiry
+        const premiumExpires = new Date();
+        premiumExpires.setMonth(premiumExpires.getMonth() + 1);
+        
+        await client.query(
+            'INSERT INTO users (username, email, password, is_premium, premium_expires_at) VALUES ($1, $2, $3, $4, $5)',
+            ['premium', 'premium@example.com', hashedPassword, true, premiumExpires]
+        );
+        
+        console.log('✅ Database seeded successfully');
+        
+    } catch (error) {
+        console.error('❌ Seeding error:', error.message);
+        // Don't throw - seeding errors shouldn't crash the app
     }
-    
-    console.log('🌱 Seeding database...');
-    
-    // Seed Artists
-    const artistsResult = await client.query(`
-        INSERT INTO artists (name, bio, image) VALUES
-        ('The Weeknd', 'Canadian singer and songwriter', '/images/artists/weeknd.jpg'),
-        ('Dua Lipa', 'English singer and songwriter', '/images/artists/dualipa.jpg'),
-        ('Ed Sheeran', 'English singer-songwriter', '/images/artists/edsheeran.jpg'),
-        ('Taylor Swift', 'American singer-songwriter', '/images/artists/taylorswift.jpg'),
-        ('Bruno Mars', 'American singer and songwriter', '/images/artists/brunomars.jpg')
-        RETURNING id
-    `);
-    
-    // Seed Albums
-    await client.query(`
-        INSERT INTO albums (title, artist_id, cover_image, release_year) VALUES
-        ('After Hours', 1, '/images/albums/afterhours.jpg', 2020),
-        ('Future Nostalgia', 2, '/images/albums/futurenostalgia.jpg', 2020),
-        ('Divide', 3, '/images/albums/divide.jpg', 2017),
-        ('1989', 4, '/images/albums/1989.jpg', 2014),
-        ('24K Magic', 5, '/images/albums/24kmagic.jpg', 2016)
-    `);
-    
-    // Seed Songs
-    await client.query(`
-        INSERT INTO songs (title, artist_id, album_id, duration, file_path, cover_image, is_premium) VALUES
-        ('Blinding Lights', 1, 1, 200, '/music/sample1.mp3', '/images/albums/afterhours.jpg', FALSE),
-        ('Save Your Tears', 1, 1, 215, '/music/sample2.mp3', '/images/albums/afterhours.jpg', FALSE),
-        ('Levitating', 2, 2, 203, '/music/sample3.mp3', '/images/albums/futurenostalgia.jpg', FALSE),
-        ('Dont Start Now', 2, 2, 183, '/music/sample4.mp3', '/images/albums/futurenostalgia.jpg', TRUE),
-        ('Shape of You', 3, 3, 234, '/music/sample5.mp3', '/images/albums/divide.jpg', FALSE),
-        ('Perfect', 3, 3, 263, '/music/sample6.mp3', '/images/albums/divide.jpg', TRUE),
-        ('Shake It Off', 4, 4, 219, '/music/sample7.mp3', '/images/albums/1989.jpg', FALSE),
-        ('Blank Space', 4, 4, 231, '/music/sample8.mp3', '/images/albums/1989.jpg', TRUE),
-        ('24K Magic', 5, 5, 226, '/music/sample9.mp3', '/images/albums/24kmagic.jpg', FALSE),
-        ('Uptown Funk', 5, 5, 269, '/music/sample10.mp3', '/images/albums/24kmagic.jpg', TRUE)
-    `);
-    
-    // Create Demo Users
-    const hashedPassword = await bcrypt.hash('demo123', 10);
-    
-    await client.query(`
-        INSERT INTO users (username, email, password, is_premium) VALUES
-        ('demo', 'demo@example.com', $1, FALSE)
-    `, [hashedPassword]);
-    
-    // Premium user with expiry
-    const premiumExpires = new Date();
-    premiumExpires.setMonth(premiumExpires.getMonth() + 1);
-    
-    await client.query(`
-        INSERT INTO users (username, email, password, is_premium, premium_expires_at) VALUES
-        ('premium', 'premium@example.com', $1, TRUE, $2)
-    `, [hashedPassword, premiumExpires]);
-    
-    console.log('✅ Database seeded successfully');
 };
 
 // ==========================================
-// QUERY HELPER
+// QUERY HELPERS
 // ==========================================
 const query = async (text, params) => {
     const start = Date.now();
-    const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-    
-    if (process.env.NODE_ENV === 'development') {
-        console.log('Executed query', { text, duration, rows: res.rowCount });
+    try {
+        const res = await pool.query(text, params);
+        const duration = Date.now() - start;
+        
+        if (process.env.NODE_ENV === 'development') {
+            console.log('Executed query', { text: text.substring(0, 50), duration, rows: res.rowCount });
+        }
+        
+        return res;
+    } catch (error) {
+        console.error('Query error:', error.message);
+        throw error;
     }
-    
-    return res;
 };
 
-// Get single row
 const getOne = async (text, params) => {
     const res = await query(text, params);
     return res.rows[0];
 };
 
-// Get multiple rows
 const getMany = async (text, params) => {
     const res = await query(text, params);
     return res.rows;
 };
 
-// Execute (insert, update, delete)
 const execute = async (text, params) => {
-    const res = await query(text, params);
-    return res;
+    return await query(text, params);
 };
 
 module.exports = {

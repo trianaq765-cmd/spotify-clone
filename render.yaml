@@ -1,0 +1,35 @@
+databases:
+  - name: spotify-db
+    plan: free
+    databaseName: spotify_clone
+    user: spotify_user
+
+services:
+  - type: web
+    name: spotify-clone
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: spotify-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MIDTRANS_SERVER_KEY
+        sync: false
+      - key: MIDTRANS_CLIENT_KEY
+        sync: false
+      - key: MIDTRANS_IS_PRODUCTION
+        value: "false"
+      - key: APP_URL
+        fromService:
+          type: web
+          name: spotify-clone
+          property: host

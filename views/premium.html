@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get Premium - Spotify Clone</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Midtrans Snap -->
+    <script src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="SB-Mid-client-xxxxx"></script>
+</head>
+<body class="premium-page">
+    <nav class="premium-nav">
+        <a href="/dashboard" class="back-link">
+            <i class="fas fa-arrow-left"></i>
+            Back to Dashboard
+        </a>
+        <div class="logo">
+            <i class="fab fa-spotify"></i>
+            <span>Spotify Clone</span>
+        </div>
+        <div class="user-info" id="user-info">
+            <!-- User info will be loaded here -->
+        </div>
+    </nav>
+
+    <main class="premium-main">
+        <!-- Premium Status (for premium users) -->
+        <div class="premium-status" id="premium-status" style="display: none;">
+            <div class="status-card">
+                <i class="fas fa-crown"></i>
+                <h2>You're a Premium Member!</h2>
+                <p>Your subscription is active until: <span id="expires-date"></span></p>
+                <div class="premium-benefits">
+                    <h3>Your Benefits:</h3>
+                    <ul>
+                        <li><i class="fas fa-check"></i> Ad-free music listening</li>
+                        <li><i class="fas fa-check"></i> Access to all premium songs</li>
+                        <li><i class="fas fa-check"></i> High quality audio</li>
+                        <li><i class="fas fa-check"></i> Unlimited skips</li>
+                    </ul>
+                </div>
+                <a href="/dashboard" class="btn-primary">Start Listening</a>
+            </div>
+        </div>
+
+        <!-- Upgrade Section (for free users) -->
+        <div class="upgrade-section" id="upgrade-section">
+            <div class="upgrade-header">
+                <h1>Get Premium free for 1 month</h1>
+                <p>Just Rp 54.990/month after. Cancel anytime.</p>
+            </div>
+
+            <div class="plans-container">
+                <div class="plan-card" data-plan="monthly">
+                    <div class="plan-badge">Popular</div>
+                    <h3>Premium Individual</h3>
+                    <div class="plan-price">
+                        <span class="price">Rp 54.990</span>
+                        <span class="period">/month</span>
+                    </div>
+                    <ul class="plan-features">
+                        <li><i class="fas fa-check"></i> 1 Premium account</li>
+                        <li><i class="fas fa-check"></i> Cancel anytime</li>
+                        <li><i class="fas fa-check"></i> Subscribe or one-time payment</li>
+                    </ul>
+                    <button class="btn-plan" onclick="selectPlan('monthly')">Get Premium Individual</button>
+                </div>
+
+                <div class="plan-card featured" data-plan="yearly">
+                    <div class="plan-badge">Best Value</div>
+                    <h3>Premium Yearly</h3>
+                    <div class="plan-price">
+                        <span class="price">Rp 549.900</span>
+                        <span class="period">/year</span>
+                    </div>
+                    <div class="plan-savings">Save 16% compared to monthly</div>
+                    <ul class="plan-features">
+                        <li><i class="fas fa-check"></i> 1 Premium account</li>
+                        <li><i class="fas fa-check"></i> 12 months of Premium</li>
+                        <li><i class="fas fa-check"></i> One-time payment</li>
+                    </ul>
+                    <button class="btn-plan primary" onclick="selectPlan('yearly')">Get Premium Yearly</button>
+                </div>
+            </div>
+
+            <div class="premium-features">
+                <h2>All Premium plans include</h2>
+                <div class="features-grid">
+                    <div class="feature">
+                        <i class="fas fa-ban"></i>
+                        <h4>Ad-free music listening</h4>
+                        <p>Enjoy uninterrupted music</p>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-download"></i>
+                        <h4>Download to listen offline</h4>
+                        <p>Save music on your device</p>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-random"></i>
+                        <h4>Play songs in any order</h4>
+                        <p>On mobile and tablet</p>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-headphones"></i>
+                        <h4>High audio quality</h4>
+                        <p>Crystal clear sound</p>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-users"></i>
+                        <h4>Listen with friends</h4>
+                        <p>Real-time listening</p>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-list"></i>
+                        <h4>Organize queue</h4>
+                        <p>Control your queue</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction History -->
+        <div class="transaction-section" id="transaction-section">
+            <h2>Transaction History</h2>
+            <div class="transactions-list" id="transactions-list">
+                <!-- Transactions will be loaded here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Payment Processing Modal -->
+    <div class="modal" id="payment-modal">
+        <div class="modal-content payment-modal-content">
+            <div class="payment-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Processing your payment...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/payment.js"></script>
+</body>
+</html>
